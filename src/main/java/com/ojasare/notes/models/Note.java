@@ -1,9 +1,7 @@
 package com.ojasare.notes.models;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.Type;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -18,6 +16,5 @@ public class Note {
     @Column(columnDefinition = "text")
     private String content;
 
-    private String ownerUsername
-            ;
+    private String ownerUsername;
 }
