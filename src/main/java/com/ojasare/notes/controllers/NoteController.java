@@ -2,7 +2,6 @@ package com.ojasare.notes.controllers;
 
 import com.ojasare.notes.models.Note;
 import com.ojasare.notes.services.NoteService;
-import com.ojasare.notes.services.impl.NoteServiceImpl;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -13,9 +12,9 @@ import java.util.List;
 @RequestMapping("/api/notes")
 public class NoteController {
 
-    private NoteServiceImpl noteService;
+    private NoteService noteService;
 
-    public NoteController(NoteServiceImpl noteService) {
+    public NoteController(NoteService noteService) {
         this.noteService = noteService;
     }
 
