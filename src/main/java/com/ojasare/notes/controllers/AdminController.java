@@ -1,7 +1,9 @@
 package com.ojasare.notes.controllers;
 
 import com.ojasare.notes.dtos.UserDTO;
+import com.ojasare.notes.models.Role;
 import com.ojasare.notes.models.User;
+import com.ojasare.notes.repositories.RoleRepository;
 import com.ojasare.notes.services.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,8 +19,11 @@ public class AdminController {
 
     private UserService userService;
 
-    public AdminController(UserService userService) {
+    private RoleRepository roleRepository;
+
+    public AdminController(UserService userService, RoleRepository roleRepository) {
         this.userService = userService;
+        this.roleRepository = roleRepository;
     }
 
 //    @PreAuthorize(value = "hasRole('ROLE_ADMIN')")
@@ -37,6 +42,45 @@ public class AdminController {
     @GetMapping("/user/{id}")
     public ResponseEntity<UserDTO> getUser(@PathVariable Long id) {
         return new ResponseEntity<>(userService.getUserById(id), HttpStatus.OK);
+    }
+
+    @PutMapping("/update-lock-status")
+    public ResponseEntity<String> updateAccountLockStatus(@RequestParam Long userId, @RequestParam boolean lock) {
+        userService.updateAccountLockStatus(userId, lock);
+        return ResponseEntity.ok("Account lock status updated");
+    }
+
+    @GetMapping("/roles")
+    public List<Role> getAllRoles() {
+        return roleRepository.findAll();
+    }
+
+    @PutMapping("/update-expiry-status")
+    public ResponseEntity<String> updateAccountExpiryStatus(@RequestParam Long userId, @RequestParam boolean expire) {
+        userService.updateAccountExpiryStatus(userId, expire);
+        return ResponseEntity.ok("Account expiry status updated");
+    }
+
+    @PutMapping("/update-enabled-status")
+    public ResponseEntity<String> updateAccountEnabledStatus(@RequestParam Long userId, @RequestParam boolean enabled) {
+        userService.updateAccountEnabledStatus(userId, enabled);
+        return ResponseEntity.ok("Account enabled status updated");
+    }
+
+    @PutMapping("/update-credentials-expiry-status")
+    public ResponseEntity<String> updateCredentialsExpiryStatus(@RequestParam Long userId, @RequestParam boolean expire) {
+        userService.updateCredentialsExpiryStatus(userId, expire);
+        return ResponseEntity.ok("Credentials expiry status updated");
+    }
+
+    @PutMapping("/update-password")
+    public ResponseEntity<String> updatePassword(@RequestParam Long userId, @RequestParam String password) {
+        try {
+            userService.updatePassword(userId, password);
+            return ResponseEntity.ok("Password updated");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
     }
 
 }

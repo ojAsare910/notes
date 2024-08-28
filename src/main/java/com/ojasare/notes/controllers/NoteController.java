@@ -2,6 +2,7 @@ package com.ojasare.notes.controllers;
 
 import com.ojasare.notes.models.Note;
 import com.ojasare.notes.services.NoteService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -10,9 +11,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/notes")
+@Slf4j
 public class NoteController {
 
-    private NoteService noteService;
+    private final NoteService noteService;
 
     public NoteController(NoteService noteService) {
         this.noteService = noteService;
@@ -22,6 +24,7 @@ public class NoteController {
     public Note createNote(@RequestBody String content, @AuthenticationPrincipal UserDetails userDetails) {
         String username = userDetails.getUsername();
         System.out.println("USER DETAILS: " + username);
+        log.info("USER DETAILS: " + username);
         return noteService.createNoteForUser(username, content);
     }
 
