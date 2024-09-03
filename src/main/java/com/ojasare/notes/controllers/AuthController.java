@@ -1,5 +1,6 @@
 package com.ojasare.notes.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ojasare.notes.models.AppRole;
 import com.ojasare.notes.models.Role;
 import com.ojasare.notes.models.User;
@@ -8,26 +9,31 @@ import com.ojasare.notes.repositories.UserRepository;
 import com.ojasare.notes.security.Response.LoginResponse;
 import com.ojasare.notes.security.Response.MessageResponse;
 import com.ojasare.notes.security.Response.UserInfoResponse;
+import com.ojasare.notes.security.jwt.TokenBlacklist;
 import com.ojasare.notes.security.jwt.JwtUtils;
+import com.ojasare.notes.security.jwt.constant.JWTUtil;
 import com.ojasare.notes.security.request.LoginRequest;
 import com.ojasare.notes.security.request.SignupRequest;
 import com.ojasare.notes.security.services.UserDetailsServiceImpl;
 import com.ojasare.notes.services.UserService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -35,26 +41,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    @Autowired
-    private JwtUtils jwtUtils;
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private PasswordEncoder encoder;
-
-    @Autowired
-    private UserService userService;
+    private final JwtUtils jwtUtils;
+    private final AuthenticationManager authenticationManager;
+    private final UserDetailsServiceImpl userDetailsService;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder encoder;
+    private final UserService userService;
+    private final TokenBlacklist tokenBlacklist;
 
     @PostMapping("/public/signin")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
@@ -68,23 +67,14 @@ public class AuthController {
             map.put("status", false);
             return new ResponseEntity<Object>(map, HttpStatus.NOT_FOUND);
         }
-
-//      set the authentication
         SecurityContextHolder.getContext().setAuthentication(authentication);
-
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-
-        String jwtToken = jwtUtils.generateTokenFromUsername(userDetails);
-
-        // Collect roles from the UserDetails
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
-
-        // Prepare the response body, now including the JWT token directly in the body
-        LoginResponse response = new LoginResponse(userDetails.getUsername(), roles, jwtToken);
-
-        // Return the response entity with the JWT token included in the response body
+        String jwtAccessToken = jwtUtils.generateAccessToken(userDetails.getUsername(), roles);
+        String jwtRefreshToken = jwtUtils.generateRefreshToken(userDetails.getUsername());
+        LoginResponse response = new LoginResponse(userDetails.getUsername(), roles, jwtAccessToken, jwtRefreshToken);
         return ResponseEntity.ok(response);
     }
 
@@ -163,6 +153,32 @@ public class AuthController {
     @GetMapping("/username")
     public String currentUserName(@AuthenticationPrincipal UserDetails userDetails) {
         return (userDetails != null) ? userDetails.getUsername() : "";
+    }
+
+    @PostMapping("/public/logout")
+    public ResponseEntity<?> logoutUser(HttpServletRequest request) {
+        String jwt = jwtUtils.extractTokenFromHeaderIfExists(request.getHeader(JWTUtil.AUTH_HEADER));
+        if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
+            tokenBlacklist.addToBlacklist(jwt);
+            SecurityContextHolder.clearContext();
+            return ResponseEntity.ok(new MessageResponse("Log out successful!"));
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new MessageResponse("Invalid or missing token"));
+        }
+    }
+
+    @GetMapping("/public/refresh-token")
+    public void generateNewAccessToken(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String jwtRefreshToken = jwtUtils.extractTokenFromHeaderIfExists(request.getHeader(JWTUtil.AUTH_HEADER));
+        if(jwtRefreshToken != null &&  jwtUtils.validateJwtToken(jwtRefreshToken)) {
+            String username = jwtUtils.getUserNameFromJwtToken(jwtRefreshToken);
+            UserDetails user = userDetailsService.loadUserByUsername(username);
+            String jwtAccessToken = jwtUtils.generateAccessToken(user.getUsername(), user.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toList()));
+            response.setContentType("application/json");
+            new ObjectMapper().writeValue(response.getOutputStream(), jwtUtils.getTokensMap(jwtAccessToken, jwtRefreshToken));
+        } else {
+            throw new RuntimeException("Refresh token required");
+        }
     }
 
 }

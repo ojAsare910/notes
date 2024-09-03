@@ -2,6 +2,7 @@ package com.ojasare.notes.services.impl;
 
 import com.ojasare.notes.models.Note;
 import com.ojasare.notes.repositories.NoteRepository;
+import com.ojasare.notes.services.AuditLogService;
 import com.ojasare.notes.services.NoteService;
 import org.springframework.stereotype.Service;
 
@@ -12,8 +13,11 @@ public class NoteServiceImpl implements NoteService {
 
     private NoteRepository noteRepository;
 
-    public NoteServiceImpl(NoteRepository noteRepository) {
+    private AuditLogService auditLogService;
+
+    public NoteServiceImpl(NoteRepository noteRepository, AuditLogService auditLogService) {
         this.noteRepository = noteRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Override
@@ -21,7 +25,9 @@ public class NoteServiceImpl implements NoteService {
         Note note = new Note();
         note.setContent(content);
         note.setOwnerUsername(username);
-        return noteRepository.save(note);
+        Note savedNote = noteRepository.save(note);
+        auditLogService.logNoteCreation(username, note);
+        return savedNote;
     }
 
     @Override
@@ -29,16 +35,24 @@ public class NoteServiceImpl implements NoteService {
         Note note = noteRepository.findById(noteId).orElseThrow(()
                 -> new RuntimeException("Note not found"));
         note.setContent(content);
-        return noteRepository.save(note);
+        Note updatedNote = noteRepository.save(note);
+        auditLogService.logNoteUpdate(username, note);
+        return updatedNote;
     }
 
     @Override
     public void deleteNoteForUser(Long noteId, String username) {
-        noteRepository.deleteById(noteId);
+        Note note = noteRepository.findById(noteId).orElseThrow(
+                () -> new RuntimeException("Note not found")
+        );
+        auditLogService.logNoteDeletion(username, noteId);
+        noteRepository.delete(note);
     }
 
     @Override
     public List<Note> getNotesForUser(String username) {
-        return noteRepository.findByOwnerUsername(username);
+        List<Note> personalNotes = noteRepository
+                .findByOwnerUsername(username);
+        return personalNotes;
     }
 }
