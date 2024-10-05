@@ -1,0 +1,49 @@
+services:
+  notes-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notes-app
+    ports:
+      - "8083:8083"
+    networks:
+      - app-network
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notes
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password123
+      SERVER_PORT: 8083
+      JWT_SECRET: mySecretKey12392797989aopspringsjsdkhkdslkjhfh432hmsmbsd802hdkljskjdghgw83snwqzpolmnbcxzqe425teyiuptyhllkkjgzxcz
+      EXPIRATION_TIME: 172800000
+      FRONTEND_URL: localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8083/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  postgres:
+    image: postgres:alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: notes
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
