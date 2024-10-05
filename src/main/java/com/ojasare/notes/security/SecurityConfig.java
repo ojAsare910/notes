@@ -1,42 +1,54 @@
 package com.ojasare.notes.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ojasare.notes.models.AppRole;
 import com.ojasare.notes.models.Role;
 import com.ojasare.notes.models.User;
 import com.ojasare.notes.repositories.RoleRepository;
 import com.ojasare.notes.repositories.UserRepository;
-import com.ojasare.notes.security.jwt.AuthEntryPointJwt;
 import com.ojasare.notes.security.jwt.AuthTokenFilter;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.ojasare.notes.security.jwt.JwtUtils;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
+import java.io.IOException;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true,
+@RequiredArgsConstructor
+@EnableMethodSecurity(
         securedEnabled = true,
         jsr250Enabled = true)
 public class SecurityConfig {
 
-    @Autowired
-    private AuthEntryPointJwt unauthorizedHandler;
+    private final JwtUtils jwtUtils;
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
@@ -50,11 +62,10 @@ public class SecurityConfig {
                 -> requests
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/auth/public/**").permitAll()
+                .requestMatchers("/api/auth/public/logout").authenticated()
                 .anyRequest().authenticated());
-        http.exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler));
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
-        http.formLogin(Customizer.withDefaults());
-        http.httpBasic(withDefaults());
+        http.logout(AbstractHttpConfigurer::disable);
         return http.build();
     }
 
