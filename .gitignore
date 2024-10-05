@@ -30,6 +30,5 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
-.vscode/
 
-/src/main/resources/certs/
+.env
